@@ -141,8 +141,7 @@ Note that in the very rare case that $(W_2^T W_2)$ is singular we should use the
 
 Adding weights to the update rules to bring everything together we get update rules for nonnegative coefficients and templates, on possibly negative data, with a fixed positive template that may have negative coefficients:
 
-$$\boxed{
-H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ + [W_1^T (V\circ (W_2H_2))]^-}{[W_1^T(V\circ X)]^- + [W_1^T (V\circ (W_2H_2))]^+ + W_1^T (V\circ (W_1H_1))} }$$
+$$\boxed{H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ + [W_1^T (V\circ (W_2H_2))]^-}{[W_1^T(V\circ X)]^- + [W_1^T (V\circ (W_2H_2))]^+ + W_1^T (V\circ (W_1H_1))} }$$
 $$\boxed{W_1 \leftarrow W_1 \circ \frac{[(V\circ X)H_1^T]^+ + [(V\circ (W_2H_2))H_1^T]^-}{[(V\circ X)H_1^T]^- + [(V\circ (W_2H_2))H_1^T]^+ + (V \circ (W_1H_1))H_1^T}}$$
 
 $$\boxed{\hat{H}_2 = (\hat{W}_2^T [V]^{diag} \hat{W}_2)^{-1} \hat{W}_2^T [V]^{diag}\hat{\Phi}}$$
@@ -152,8 +151,7 @@ For the $H_2$ update rule I've introduced some new notation as follows: $\hat{W}
 
 And the simplified update rules, for non-negative coefficients and templates on data that is allowed to be negative, with weights:
 
-$$\boxed{
-H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ }{[W_1^T(V\circ X)]^- + W_1^T (V\circ (W_1H_1))}}$$
+$$\boxed{H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ }{[W_1^T(V\circ X)]^- + W_1^T (V\circ (W_1H_1))}}$$
 $$\boxed{W_1 \leftarrow W_1 \circ \frac{[(V\circ X)H_1^T]^+ }{[(V\circ X)H_1^T]^- + (V \circ (W_1H_1))H_1^T}}$$
 
 ----
