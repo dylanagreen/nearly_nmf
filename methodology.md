@@ -150,12 +150,13 @@ $$\boxed{\hat{H}_2 = (\hat{W}_2^T [V]^{diag} \hat{W}_2)^{-1} \hat{W}_2^T [V]^{di
 For the $H_2$ update rule I've introduced some new notation as follows: $\hat{W}_2$ is a block diagonal, but not square, matrix constructed with the $W_2$ matrix $N$ times along the diagonal, and the rest of the elements set to 0, with a final dimensionality of $dN \times qN$. $[V]^{diag}$ is the $dN \times dN$ diagonal matrix constructed by concatenating every exposure's pixelwise weights and placing the elements along the diagonal, and $\hat{\Phi}$ is a vector formed by concatenating every column (exposure) of $\Phi = X - (W_1H_1)$. The resulting vector $\hat{H}_2$ is the vector resulting from concatenating each column of $H_2$, and returning it to matrix form is simply a matter of unfolding the concatenation back into a 2-dimensional matrix.
 
 
-And the simplified update rules, for non-negative coefficients and templates on data that is allowed to be negative, weight weights:
+And the simplified update rules, for non-negative coefficients and templates on data that is allowed to be negative, with weights:
 
 $$\boxed{
-H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ }{[W_1^T(V\circ X)]^- + W_1^T (V\circ (W_1H_1))}
-}$$
+H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ }{[W_1^T(V\circ X)]^- + W_1^T (V\circ (W_1H_1))}}$$
 $$\boxed{W_1 \leftarrow W_1 \circ \frac{[(V\circ X)H_1^T]^+ }{[(V\circ X)H_1^T]^- + (V \circ (W_1H_1))H_1^T}}$$
+
+----
 
 
 [^1]: Zhu, Guangtun. “Nonnegative Matrix Factorization (NMF) with Heteroscedastic Uncertainties and Missing Data.” arXiv, December 18, 2016. http://arxiv.org/abs/1612.06037.
