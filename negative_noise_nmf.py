@@ -2,7 +2,8 @@ import numpy as np
 import numpy.typing as npt
 
 def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None, 
-            W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500):
+            W_start: npt.ArrayLike = None, n_templates: int = 2, 
+            n_iter: int = 500) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights.
 
     Parameters
