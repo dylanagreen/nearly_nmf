@@ -164,6 +164,49 @@ $$\boxed{H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ }{[W_1^T(V\circ X)]
 
 $$\boxed{W_1 \leftarrow W_1 \circ \frac{[(V\circ X)H_1^T]^+ }{[(V\circ X)H_1^T]^- + (V \circ (W_1H_1))H_1^T}}$$
 
+### Code
+Assuming you've initialized $H_1$, $W_1$, $W_2$ and $H_2$ to some values, the following somewhat optimized code implements the aforementioned update rules, running for `n_iter` iterations:
+
+    def split_pos_neg(A):
+      return (np.abs(A) + A) / 2, (np.abs(A) - A) / 2
+
+    # Precomputing some values for efficiency
+    V_X = V * X
+    # We need to compute these inverses for H_2 updating
+    # but V and W_2 do not update, so we can compute them
+    # outside the iteration to avoid having to compute them within.
+    WVW_inv = []
+    for i in range(H_2.shape[-1]):
+        WVW_inv.append(np.linalg.inv((W_2.T * V[:, i]) @ W_2))
+
+    for _ in range(n_iter):
+        # Splitting the two components into positive and negative
+        # for the H_1 update rule.
+        W_VX = W_1.T @ V_X
+        W_VX_pos, W_VX_neg = split_pos_neg(W_VX)
+
+        WWH = W_1.T @ (V * (W_2 @ H_2))
+        WWH_pos, WWH_neg = split_pos_neg(WWH)
+
+        H_1 = H_1 * (W_VX_pos + WWH_neg) / (W_1.T @ (V * (W_1 @ H_1)) + W_VX_neg + WWH_pos)
+        H_1 = np.nan_to_num(H_1, nan=0, posinf=0)
+
+        # Splitting the two components into positive and
+        # negative for the W_1 update rule
+        V_XH = V_X @ H_1.T
+        V_XH_pos, V_XH_neg = split_pos_neg(V_XH)
+
+        WHH = (V * (W_2 @ H_2)) @ H_1.T
+        WHH_pos, WHH_neg = split_pos_neg(WHH)
+
+        W_1 = W_1 * (V_XH_pos + WHH_neg) / ((V * (W_1 @ H_1)) @ H_1.T + V_XH_neg + WHH_pos)
+        W_1 = np.nan_to_num(W_1, nan=0, posinf=0)
+
+        # H_2 update rule is done per exposure, but we
+        # can precompute this value independent of exposure.
+        W_VX_WH = W_2.T @ (V * (X - W_1 @ H_1))
+        for i in range(H_2.shape[-1]):
+            H_2[:, i] = WVW_inv[i] @ W_VX_WH[:, i]
 
 [^1]: Zhu, Guangtun. “Nonnegative Matrix Factorization (NMF) with Heteroscedastic Uncertainties and Missing Data.” arXiv, December 18, 2016. http://arxiv.org/abs/1612.06037.
 
