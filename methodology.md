@@ -145,9 +145,17 @@ $$\boxed{H_1 \leftarrow H_1 \circ \frac{[W_1^T (V\circ X)]^+ + [W_1^T (V\circ (W
 
 $$\boxed{W_1 \leftarrow W_1 \circ \frac{[(V\circ X)H_1^T]^+ + [(V\circ (W_2H_2))H_1^T]^-}{[(V\circ X)H_1^T]^- + [(V\circ (W_2H_2))H_1^T]^+ + (V \circ (W_1H_1))H_1^T}}$$
 
-$$\boxed{\hat{H}_2 = (\hat{W}_2^T [V]^{diag} \hat{W}_2)^{-1} \hat{W}_2^T [V]^{diag}\hat{\Phi}}$$
+$$\boxed{H_{2,i} = (W_2^T [V_i]^{diag} W_2)^{-1}W_2^T (V_i \circ \Phi_i) }$$
 
-For the $H_2$ update rule I've introduced some new notation as follows: $\hat{W}_2$ is a block diagonal, but not square, matrix constructed with the $W_2$ matrix $N$ times along the diagonal, and the rest of the elements set to 0, with a final dimensionality of $dN \times qN$. $[V]^{diag}$ is the $dN \times dN$ diagonal matrix constructed by concatenating every exposure's pixelwise weights and placing the elements along the diagonal, and $\hat{\Phi}$ is a vector formed by concatenating every column (exposure) of $\Phi = X - (W_1H_1)$. The resulting vector $\hat{H}_2$ is the vector resulting from concatenating each column of $H_2$, and returning it to matrix form is simply a matter of unfolding the concatenation back into a 2-dimensional matrix.
+Where in the $H_2$ update rule we update each exposures coefficients individually to account for the weights varying per exposure. I have introduced $\Phi = X - (W_1H_1)$ to simplify notation. $[V_i]^{diag}$ is a diagonal matrix with the elements of $V_i$ along the diagonal.
+
+In matrix notation, with some loss of understanding, this can be expressed as:
+
+$$\hat{H}_2 = (\hat{W}_2^T [V]^{diag} \hat{W}_2)^{-1} \hat{W}_2^T [V]^{diag}\hat{\Phi}$$
+
+$\hat{W}_2$ is a block diagonal, but not square, matrix constructed with the $W_2$ matrix $N$ times along the diagonal, and the rest of the elements set to 0, with a final dimensionality of $dN \times qN$. $[V]^{diag}$ is the $dN \times dN$ diagonal matrix constructed by concatenating every exposure's pixelwise weights and placing the elements along the diagonal, and $\hat{\Phi}$ is a vector formed by concatenating every column (exposure) of $\Phi = X - (W_1H_1)$. The resulting vector $\hat{H}_2$ is the vector resulting from concatenating each column of $H_2$, and returning it to matrix form is simply a matter of unfolding the concatenation back into a 2-dimensional matrix.
+
+where $i$ indexes over each exposure. In essence, each exposure's $H_2$ coefficients depend on the weights for that exposure and the exposure minus its reconstruction from the strictly positive templates.
 
 
 And the simplified update rules, for non-negative coefficients and templates on data that is allowed to be negative, with weights:
