@@ -1,11 +1,11 @@
 import numpy as np
 import numpy.typing as npt
 
-def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
+def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             W_start: npt.ArrayLike = None, n_templates: int = 2,
             n_iter: int = 500, update_H: bool = True,
             update_W: bool = True) ->  tuple[npt.NDArray, npt.NDArray]:
-    """Fit NMF templates to noisy, possibly negative, data with weights.
+    """Fit NMF templates to noisy, possibly negative, data with weights using the "shift-NMF" algorithm.
 
     Parameters
     ----------
@@ -96,6 +96,114 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             W = np.nan_to_num(W, nan=0, posinf=0)
     return H, W
 
+def split_pos_neg(A: npt.ArrayLike):
+    """Splits a matrix into its positive and negative elements, with all other values set to 0.
+
+    Parameters
+    ----------
+    A : array_like
+        Input array of any shape.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of the same shape as A, with negative or zero elements set to 0.
+    numpy.ndarray
+        Array of the same shape as A, with positive or zero elements set to 0.
+    """
+    A = np.asarray(A)
+    return (np.abs(A) + A) / 2, (np.abs(A) - A) / 2
+
+
+def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
+            W_start: npt.ArrayLike = None, n_templates: int = 2,
+            n_iter: int = 500, update_H: bool = True,
+            update_W: bool = True) ->  tuple[npt.NDArray, npt.NDArray]:
+    """Fit NMF templates to noisy, possibly negative, data with weights using the "nearly-NMF" algorithm.
+
+    Parameters
+    ----------
+    X : array_like
+        Input data of shape (n_dimensions, n_observations).
+    V : array_like
+        Input weights of shape (n_dimensions, n_observations).
+    H_start : array_like, optional
+        Starting point for the H matrix. Defaults to a matrix of random
+        normal variables with a mean of 0 and a sigma of 2. If provided
+        must have shape (n_templates, n_observations).
+    W_start : array_like, optional
+        Starting point for the W matrix. Defaults to a matrix of random
+        normal variables with a mean of 0 and a sigma of 2. If provided
+        must have shape (n_dimensions, n_templates).
+    n_templates : int, optional
+        Number of templates to fit. Not necessary when providing
+        a starting matrix for H or W. Defaults to 2.
+    n_iter : int, optional
+        Number of fitting iterations to run. Defaults to 500.
+    update_H : bool, optional
+        Whether to update H when running the iteration. Set to False
+        to fit only templates with the given coefficients. Defaults to True.
+    update_W : bool, optional
+        Whether to update W when running the iteration. Set to False
+        to fit only coefficients with the given templates. Defaults to True.
+
+    Returns
+    -------
+    H : numpy.ndarray
+        The fitted NMF coefficients with shape (n_templates,
+        n_observations). Each column represents the coefficients
+        corresponding to a column of X.
+    W : numpy.ndarray
+        The fitted NMF templates with shape (n_dimensions, n_templates).
+        Each column represents one template.
+    """
+    
+    X, V = np.asarray(X), np.asarray(V)
+
+    if (H_start is not None) and (W_start is not None):
+        assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
+    assert (update_H or update_W), "At least one of update_H or update_W must be True"
+    if H_start is not None: n_templates = H_start.shape[0]
+    elif W_start is not None: n_templates = W_start.shape[1]
+
+    # Size of the coefficients and templates respectively
+    # to ensure we use the same size everywhere
+    H_shape = (n_templates, X.shape[1])
+    W_shape = (X.shape[0], n_templates)
+    rng = np.random.default_rng(100921)
+
+    # Randomly initialize the H and W matrices if necessary.
+    if H_start is not None:
+        H = np.asarray(H_start)
+    else:
+        H = rng.uniform(0, 2, H_shape)
+
+
+    if W_start is not None:
+        W = np.asarray(W_start)
+    else:
+        W = rng.uniform(0, 2, W_shape)
+
+    # Precomputing some values for efficiency
+    V_X = V * X
+    for j in range(n_iter):
+        # H-step
+        if update_H:
+            W_VX = W.T @ V_X
+            W_VX_pos, W_VX_neg = split_pos_neg(W_VX)
+
+            H = H * (W_VX_pos) / (W.T @ (V * (W @ H)) + W_VX_neg)
+            H = np.nan_to_num(H, nan=0, posinf=0)
+        # W-step
+        if update_W:
+            V_XH = V_X @ H.T
+            V_XH_pos, V_XH_neg = split_pos_neg(V_XH)
+
+            W = W * (V_XH_pos) / ((V * (W @ H)) @ H.T + V_XH_neg)
+            W = np.nan_to_num(W, nan=0, posinf=0)
+
+    return H, W
+
 # TODO: think of a better name for this algorithm.
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
@@ -153,7 +261,7 @@ class NMF:
     def fit(self):
         """Fit this NMF object to noisy, possibly negative, data with weights.
         """
-        self.H, self.W = fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
+        self.H, self.W = shift_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
 
     def predict(self) ->  npt.NDArray:
         """Generate a reconstruction of the original input data using the stored factorization.
@@ -185,6 +293,6 @@ class NMF:
             Each column represents the coefficients corresponding
             to a column of X.
         """
-        return fit_NMF(X, V, self.H, self.W, n_iter=self.n_iter, update_W=False)[0]
+        return shift_NMF(X, V, self.H, self.W, n_iter=self.n_iter, update_W=False)[0]
 
 
