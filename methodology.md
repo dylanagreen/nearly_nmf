@@ -1,7 +1,7 @@
 # Handling Negative Noise with NMF
 ----
 
-## Algorithm 1
+## Algorithm 1: Shift-NMF
 
 Non-negative matrix factorization (NMF) requires that all data be non-negative, which is fundamentally incompatible with postprocessed spectroscopic data that can legitimately include some negative values. In general, true emission and continuum features will be non-negative, but noise or sky subtraction can drive some pixels into a negative regime. When fitting a clipped version of this data, where negative values are set to 0, we will end up with inaccurate templates that believe the noise mean is some value $\geq 0$.
 
@@ -90,7 +90,7 @@ Here `n_iter` can be reduced to some small amount ($\lesssim 5$) since convergen
 
 ----
 
-## Algorithm 2
+## Algorithm 2: Nearly-NMF
 
 In this example, we will have one set of "regular" NMF templates, and one set with nonnegative templates but with coefficients that may vary either positive *or* negative. Thus the objective function is $$\chi^2 = ||X - W_1H_1 - W_2H_2||^2$$
 
