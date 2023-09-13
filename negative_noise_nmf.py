@@ -204,6 +204,67 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None
 
     return H, W
 
+def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
+            W_start: npt.ArrayLike = None, n_templates: int = 2,
+            n_iter: int = 500, update_H: bool = True,
+            update_W: bool = True, algorithm="shift") ->  tuple[npt.NDArray, npt.NDArray]:
+    """Fit NMF templates to noisy, possibly negative, data with weights using the specified algorithm.
+
+    Parameters
+    ----------
+    X : array_like
+        Input data of shape (n_dimensions, n_observations).
+    V : array_like
+        Input weights of shape (n_dimensions, n_observations).
+    H_start : array_like, optional
+        Starting point for the H matrix. Defaults to a matrix of random
+        normal variables with a mean of 0 and a sigma of 2. If provided
+        must have shape (n_templates, n_observations).
+    W_start : array_like, optional
+        Starting point for the W matrix. Defaults to a matrix of random
+        normal variables with a mean of 0 and a sigma of 2. If provided
+        must have shape (n_dimensions, n_templates).
+    n_templates : int, optional
+        Number of templates to fit. Not necessary when providing
+        a starting matrix for H or W. Defaults to 2.
+    n_iter : int, optional
+        Number of fitting iterations to run. Defaults to 500.
+    update_H : bool, optional
+        Whether to update H when running the iteration. Set to False
+        to fit only templates with the given coefficients. Defaults to True.
+    update_W : bool, optional
+        Whether to update W when running the iteration. Set to False
+        to fit only coefficients with the given templates. Defaults to True.
+    algorithm : {"shift", "nearly"}, optional
+        The algorithm to use to do the fit. 
+            * "shift" : Uses the shift-NMF algorithm, where all data is shifted
+            to the nonnegative half plane and NMF is fitted with a fixed
+            template/coefficient pair accounting for the shift.
+            * "nearly" : Uses the nearly-NMF algorithm, where the positive
+            and negative components of the input data are seperated and accounted
+            for separately in the update rules.
+
+    Returns
+    -------
+    H : numpy.ndarray
+        The fitted NMF coefficients with shape (n_templates,
+        n_observations). Each column represents the coefficients
+        corresponding to a column of X.
+    W : numpy.ndarray
+        The fitted NMF templates with shape (n_dimensions, n_templates).
+        Each column represents one template.
+    """
+    if algorithm == "shift":
+        H, W = shift_NMF(X, V, H_start, W_start, n_templates, n_iter, update_H, update_W)
+    elif algorithm == "nearly":
+        H, W = nearly_NMF(X, V, H_start, W_start, n_templates, n_iter, update_H, update_W)
+    else:
+        print("Algorithm not found, aborting!")
+        return
+    
+    return H, W
+
+
 # TODO: think of a better name for this algorithm.
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
