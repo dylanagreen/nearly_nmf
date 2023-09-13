@@ -268,7 +268,8 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
 # TODO: think of a better name for this algorithm.
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
-                 W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500):
+                 W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
+                 algorithm: str = "shift"):
         """An NMF model object. This object holds all of the relevant NMF algorithmic data, namely
         fitted coefficients and templates/basis vectors for its training dataset.
 
@@ -316,13 +317,16 @@ class NMF:
             self.W = np.asarray(W_start)
         else:
             self.W = rng.uniform(0, 2, W_shape)
+            
+                        
+        self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
 
         self.n_iter = n_iter
 
     def fit(self):
         """Fit this NMF object to noisy, possibly negative, data with weights.
         """
-        self.H, self.W = shift_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
+        self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
 
     def predict(self) ->  npt.NDArray:
         """Generate a reconstruction of the original input data using the stored factorization.
@@ -354,6 +358,6 @@ class NMF:
             Each column represents the coefficients corresponding
             to a column of X.
         """
-        return shift_NMF(X, V, self.H, self.W, n_iter=self.n_iter, update_W=False)[0]
+        return self.fit_NMF(X, V, self.H, self.W, n_iter=self.n_iter, update_W=False)[0]
 
 
