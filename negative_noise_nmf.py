@@ -1,11 +1,13 @@
 import numpy as np
 import numpy.typing as npt
 
-def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
-            W_start: npt.ArrayLike = None, n_templates: int = 2,
-            n_iter: int = 500, update_H: bool = True,
+def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
+            W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "shift-NMF" algorithm.
+    
+    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF` 
+    to fit templates instead of calling this function directly.
 
     Parameters
     ----------
@@ -13,17 +15,10 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         Input data of shape (n_dimensions, n_observations).
     V : array_like
         Input weights of shape (n_dimensions, n_observations).
-    H_start : array_like, optional
-        Starting point for the H matrix. Defaults to a matrix of random
-        normal variables with a mean of 0 and a sigma of 2. If provided
-        must have shape (n_templates, n_observations).
-    W_start : array_like, optional
-        Starting point for the W matrix. Defaults to a matrix of random
-        normal variables with a mean of 0 and a sigma of 2. If provided
-        must have shape (n_dimensions, n_templates).
-    n_templates : int, optional
-        Number of templates to fit. Not necessary when providing
-        a starting matrix for H or W. Defaults to 2.
+    H_start : array_like
+        Starting point for the H matrix. Must have shape (n_templates, n_observations).
+    W_start : array_like
+        Starting point for the W matrix. Must have shape (n_dimensions, n_templates).
     n_iter : int, optional
         Number of fitting iterations to run. Defaults to 500.
     update_H : bool, optional
@@ -43,31 +38,9 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     """
+    # Copy H and W to avoid mutating the inputs
     X, V = np.asarray(X), np.asarray(V)
-
-    if (H_start is not None) and (W_start is not None):
-        assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
-    assert (update_H or update_W), "At least one of update_H or update_W must be True"
-    if H_start is not None: n_templates = H_start.shape[0]
-    elif W_start is not None: n_templates = W_start.shape[1]
-
-    # Size of the coefficients and templates respectively
-    # to ensure we use the same size everywhere
-    H_shape = (n_templates, X.shape[1])
-    W_shape = (X.shape[0], n_templates)
-    rng = np.random.default_rng(100921)
-
-    # Randomly initialize the H and W matrices if necessary.
-    if H_start is not None:
-        H = np.asarray(H_start)
-    else:
-        H = rng.uniform(0, 2, H_shape)
-
-
-    if W_start is not None:
-        W = np.asarray(W_start)
-    else:
-        W = rng.uniform(0, 2, W_shape)
+    H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
 
     # Only shift if the lowest value of X is negative, otherwise
     # we can ignore the shifting
@@ -115,29 +88,23 @@ def split_pos_neg(A: npt.ArrayLike):
     return (np.abs(A) + A) / 2, (np.abs(A) - A) / 2
 
 
-def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
-            W_start: npt.ArrayLike = None, n_templates: int = 2,
-            n_iter: int = 500, update_H: bool = True,
+def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
+            W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "nearly-NMF" algorithm.
-
+    
+    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF` 
+    to fit templates instead of calling this function directly.
     Parameters
     ----------
     X : array_like
         Input data of shape (n_dimensions, n_observations).
     V : array_like
         Input weights of shape (n_dimensions, n_observations).
-    H_start : array_like, optional
-        Starting point for the H matrix. Defaults to a matrix of random
-        normal variables with a mean of 0 and a sigma of 2. If provided
-        must have shape (n_templates, n_observations).
-    W_start : array_like, optional
-        Starting point for the W matrix. Defaults to a matrix of random
-        normal variables with a mean of 0 and a sigma of 2. If provided
-        must have shape (n_dimensions, n_templates).
-    n_templates : int, optional
-        Number of templates to fit. Not necessary when providing
-        a starting matrix for H or W. Defaults to 2.
+    H_start : array_like
+        Starting point for the H matrix. Must have shape (n_templates, n_observations).
+    W_start : array_like
+        Starting point for the W matrix. Must have shape (n_dimensions, n_templates).
     n_iter : int, optional
         Number of fitting iterations to run. Defaults to 500.
     update_H : bool, optional
@@ -157,33 +124,10 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     """
-    
+    # Copy H and W to avoid mutating the inputs
     X, V = np.asarray(X), np.asarray(V)
-
-    if (H_start is not None) and (W_start is not None):
-        assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
-    assert (update_H or update_W), "At least one of update_H or update_W must be True"
-    if H_start is not None: n_templates = H_start.shape[0]
-    elif W_start is not None: n_templates = W_start.shape[1]
-
-    # Size of the coefficients and templates respectively
-    # to ensure we use the same size everywhere
-    H_shape = (n_templates, X.shape[1])
-    W_shape = (X.shape[0], n_templates)
-    rng = np.random.default_rng(100921)
-
-    # Randomly initialize the H and W matrices if necessary.
-    if H_start is not None:
-        H = np.asarray(H_start)
-    else:
-        H = rng.uniform(0, 2, H_shape)
-
-
-    if W_start is not None:
-        W = np.asarray(W_start)
-    else:
-        W = rng.uniform(0, 2, W_shape)
-
+    H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
+    
     # Precomputing some values for efficiency
     V_X = V * X
     for j in range(n_iter):
@@ -254,10 +198,35 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     """
+    
+    if (H_start is not None) and (W_start is not None):
+        assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
+    assert (update_H or update_W), "At least one of update_H or update_W must be True"
+    if H_start is not None: n_templates = H_start.shape[0]
+    elif W_start is not None: n_templates = W_start.shape[1]
+
+    # Size of the coefficients and templates respectively
+    # to ensure we use the same size everywhere
+    H_shape = (n_templates, X.shape[1])
+    W_shape = (X.shape[0], n_templates)
+    rng = np.random.default_rng(100921)
+
+    # Randomly initialize the H and W matrices if necessary.
+    if H_start is not None:
+        H = np.asarray(H_start)
+    else:
+        H = rng.uniform(0, 2, H_shape)
+
+
+    if W_start is not None:
+        W = np.asarray(W_start)
+    else:
+        W = rng.uniform(0, 2, W_shape)
+        
     if algorithm == "shift":
-        H, W = shift_NMF(X, V, H_start, W_start, n_templates, n_iter, update_H, update_W)
+        H, W = shift_NMF(X, V, H, W, n_iter, update_H, update_W)
     elif algorithm == "nearly":
-        H, W = nearly_NMF(X, V, H_start, W_start, n_templates, n_iter, update_H, update_W)
+        H, W = nearly_NMF(X, V, H, W, n_iter, update_H, update_W)
     else:
         print("Algorithm not found, aborting!")
         return
@@ -265,7 +234,6 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     return H, W
 
 
-# TODO: think of a better name for this algorithm.
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
                  W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
@@ -318,7 +286,8 @@ class NMF:
         else:
             self.W = rng.uniform(0, 2, W_shape)
             
-                        
+        # Internally store which fitting function we'll be using since the
+        # object initialization has done sanity checking.
         self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
 
         self.n_iter = n_iter
