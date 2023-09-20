@@ -77,7 +77,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
             
         if return_chi_2:
-            c2 = np.linalg.norm(V * (X - W @ H - shift))
+            c2 = np.linalg.norm(V * (X - (W @ H - shift)))
             chi_2.append(c2)
             
     if return_chi_2:
