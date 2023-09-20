@@ -59,6 +59,12 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         X = X - shift
     else:
         shift = 0
+        
+    # The initial chi^2 pre fitting
+    if return_chi_2:
+        c2 = np.linalg.norm(V * (X - (W @ H - shift)))
+        chi_2.append(c2)
+        
     V_X = V * X # Weighted X, outside the loop for efficiency
     for _ in range(n_iter):
         # H Step
@@ -151,6 +157,10 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
     
     chi_2 = []
+    # The initial chi^2 pre fitting
+    if return_chi_2:
+        c2 = np.linalg.norm(V * (X - W @ H))
+        chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
     for j in range(n_iter):
