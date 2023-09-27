@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 import numpy.typing as npt
 
@@ -331,12 +332,12 @@ class NMF:
         if H_start is not None:
             self.H = np.asarray(H_start)
         else:
-            self.H = rng.uniform(0, 2, H_shape)
+            self.H = self.rng.uniform(0, 2, H_shape)
 
         if W_start is not None:
             self.W = np.asarray(W_start)
         else:
-            self.W = rng.uniform(0, 2, W_shape)
+            self.W = self.rng.uniform(0, 2, W_shape)
             
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
@@ -349,7 +350,10 @@ class NMF:
     def fit(self):
         """Fit this NMF object to noisy, possibly negative, data with weights.
         """
-        self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter, return_chi_2=self.return_chi_2)
+        if self.return_chi_2:
+            self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter, return_chi_2=self.return_chi_2)
+        else:
+            self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
 
     def predict(self) ->  npt.NDArray:
         """Generate a reconstruction of the original input data using the stored factorization.
