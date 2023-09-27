@@ -63,7 +63,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.linalg.norm(V * (X - (W @ H - shift)))
+        c2 = np.linalg.norm(V * (X - (W @ H - shift))) ** 2
         chi_2.append(c2)
         
     V_X = V * X # Weighted X, outside the loop for efficiency
@@ -84,7 +84,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
             
         if return_chi_2:
-            c2 = np.linalg.norm(V * (X - (W @ H - shift)))
+            c2 = np.linalg.norm(V * (X - (W @ H - shift))) ** 2
             chi_2.append(c2)
             
     if return_chi_2:
@@ -160,7 +160,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     chi_2 = []
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.linalg.norm(V * (X - W @ H))
+        c2 = np.linalg.norm(V * (X - W @ H)) ** 2
         chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
@@ -181,7 +181,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
             
         if return_chi_2:
-            c2 = np.linalg.norm(V * (X - W @ H))
+            c2 = np.linalg.norm(V * (X - W @ H)) ** 2
             chi_2.append(c2)
 
     if return_chi_2:
