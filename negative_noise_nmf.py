@@ -7,8 +7,8 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "shift-NMF" algorithm.
-    
-    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF` 
+
+    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
     to fit templates instead of calling this function directly.
 
     Parameters
@@ -44,7 +44,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     chi_2 : numpy.ndarray, optional
-        The chi^2 history of the fit.  Only returned if `return_chi_2` is True. 
+        The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
     # Copy H and W to avoid mutating the inputs
     X, V = np.asarray(X), np.asarray(V)
@@ -60,12 +60,12 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         X = X - shift
     else:
         shift = 0
-        
+
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.linalg.norm(np.sqrt(V) * (X - (W @ H - shift))) ** 2
+        c2 = np.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
         chi_2.append(c2)
-        
+
     V_X = V * X # Weighted X, outside the loop for efficiency
     for _ in range(n_iter):
         # H Step
@@ -82,11 +82,11 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         if update_W:
             W = W * ((V_X) @ H.T) / ((V * (W @ H - shift)) @ H.T)
             W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
-            
+
         if return_chi_2:
-            c2 = np.linalg.norm(np.sqrt(V) * (X - (W @ H - shift))) ** 2
+            c2 = np.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
             chi_2.append(c2)
-            
+
     if return_chi_2:
         return H, W, chi_2
     else:
@@ -115,8 +115,8 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "nearly-NMF" algorithm.
-    
-    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF` 
+
+    WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
     to fit templates instead of calling this function directly.
     Parameters
     ----------
@@ -151,16 +151,16 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     chi_2 : numpy.ndarray, optional
-        The chi^2 history of the fit.  Only returned if `return_chi_2` is True. 
+        The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
     # Copy H and W to avoid mutating the inputs
     X, V = np.asarray(X), np.asarray(V)
     H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
-    
+
     chi_2 = []
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.linalg.norm(np.sqrt(V) * (X - W @ H)) ** 2
+        c2 = np.sum((np.sqrt(V) * (X - W @ H)) ** 2)
         chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
@@ -179,9 +179,9 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
 
             W = W * (V_XH_pos) / ((V * (W @ H)) @ H.T + V_XH_neg)
             W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
-            
+
         if return_chi_2:
-            c2 = np.linalg.norm(np.sqrt(V) * (X - W @ H)) ** 2
+            c2 = np.sum((np.sqrt(V) * (X - W @ H)) ** 2)
             chi_2.append(c2)
 
     if return_chi_2:
@@ -222,7 +222,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         Whether to update W when running the iteration. Set to False
         to fit only coefficients with the given templates. Defaults to True.
     algorithm : {"shift", "nearly"}, optional
-        The algorithm to use to do the fit. 
+        The algorithm to use to do the fit.
             * "shift" : Uses the shift-NMF algorithm, where all data is shifted
             to the nonnegative half plane and NMF is fitted with a fixed
             template/coefficient pair accounting for the shift.
@@ -244,9 +244,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         The fitted NMF templates with shape (n_dimensions, n_templates).
         Each column represents one template.
     chi_2 : numpy.ndarray, optional
-        The chi^2 history of the fit.  Only returned if `return_chi_2` is True. 
+        The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
-    
+
     if (H_start is not None) and (W_start is not None):
         assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
     assert (update_H or update_W), "At least one of update_H or update_W must be True"
@@ -270,7 +270,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         W = np.asarray(W_start)
     else:
         W = rng.uniform(0, 2, W_shape)
-        
+
     if algorithm == "shift":
         to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2)
     elif algorithm == "nearly":
@@ -278,7 +278,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     else:
         print("Algorithm not found, aborting!")
         return
-    
+
     return to_return
 
 
@@ -312,7 +312,7 @@ class NMF:
             Whether to track and return the chi^2 history of the fit. This
             involves computing a matrix norm, so will slightly slow the
             fit depending on data size. Defaults to False.
-        
+
         """
         self.X, self.V = np.asarray(X), np.asarray(V)
 
@@ -338,7 +338,7 @@ class NMF:
             self.W = np.asarray(W_start)
         else:
             self.W = self.rng.uniform(0, 2, W_shape)
-            
+
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
         self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
