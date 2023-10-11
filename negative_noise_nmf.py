@@ -67,7 +67,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         chi_2.append(c2)
 
     V_X = V * X # Weighted X, outside the loop for efficiency
-    for _ in range(n_iter):
+    for i in range(n_iter):
         # H Step
         if update_H:
             H = H * (W.T @ (V_X)) / (W.T @ (V * (W @ H - shift)))
@@ -86,6 +86,8 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         if return_chi_2:
             c2 = np.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
             chi_2.append(c2)
+            if i % 10 == 0:
+                print(i, c2)
 
     if return_chi_2:
         return H, W, chi_2
@@ -164,7 +166,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
-    for j in range(n_iter):
+    for i in range(n_iter):
         # H-step
         if update_H:
             W_VX = W.T @ V_X
@@ -183,6 +185,9 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         if return_chi_2:
             c2 = np.sum((np.sqrt(V) * (X - W @ H)) ** 2)
             chi_2.append(c2)
+            
+            if i % 10 == 0:
+                print(i, c2)
 
     if return_chi_2:
         return H, W, chi_2
