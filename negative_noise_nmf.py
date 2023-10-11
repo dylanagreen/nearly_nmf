@@ -323,7 +323,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         W = xp.asarray(W_start)
     else:
         W = xp.asarray(rng.uniform(0, 2, W_shape))
-        
+
     if algorithm == "shift":
         to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2)
     elif algorithm == "nearly":
@@ -396,7 +396,7 @@ class NMF:
             self.W = xp.asarray(W_start)
         else:
             self.W = xp.asarray(self.rng.uniform(0, 2, W_shape))
-            
+
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
         self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
