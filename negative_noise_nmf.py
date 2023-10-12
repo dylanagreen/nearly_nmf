@@ -100,7 +100,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
 
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = xp.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
+        c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
         chi_2.append(c2)
 
     V_X = V * X # Weighted X, outside the loop for efficiency
@@ -226,7 +226,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = xp.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
 
         if return_chi_2:
-            c2 = xp.sum((np.sqrt(V) * (X - W @ H)) ** 2)
+            c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
             chi_2.append(c2)
             
             if i % 10 == 0:
