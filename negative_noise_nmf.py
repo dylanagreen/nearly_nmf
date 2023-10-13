@@ -3,6 +3,40 @@ import numpy as np
 import numpy.typing as npt
 
 nan_eps = 1e-6
+
+# check if cupy is installed and a GPU is available
+try:
+    import cupy as cp
+    if not cp.is_available():
+        cp = None
+except ImportError:
+    cp = None
+
+def _get_array_module(data):
+    """
+    Return either numpy or cupy depending upon type of `data`
+
+    Parameters
+    ----------
+    data : array_like
+        Input array to derive CPU or GPU usage
+
+    Returns
+    -------
+    xp : module
+        either cupy or numpy
+
+    Raises
+    ------
+    ValueError if data is neither numpy nor cupy array
+    """
+    if isinstance(data, np.ndarray):
+        return np
+    elif cp is not None and isinstance(data, cp.ndarray):
+        return cp
+    else:
+        raise ValueError(f'Unknown array type {type(data)}')
+
 def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
@@ -46,14 +80,17 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     chi_2 : numpy.ndarray, optional
         The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
+    # GPU (cupy) or CPU (numpy)?
+    xp = _get_array_module(X)
+
     # Copy H and W to avoid mutating the inputs
-    X, V = np.asarray(X), np.asarray(V)
-    H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
+    X, V = xp.asarray(X), xp.asarray(V)
+    H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
 
     chi_2 = []
     # Only shift if the lowest value of X is negative, otherwise
     # we can ignore the shifting
-    shift = np.min(X)
+    shift = xp.min(X)
     if shift < 0:
         # Since the shift is negative we need to subtract it here rather
         # than add it to shift X so the minimum is 0
@@ -63,7 +100,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
 
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
+        c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
         chi_2.append(c2)
 
     V_X = V * X # Weighted X, outside the loop for efficiency
@@ -76,15 +113,15 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             # If the weights are set to 0 we might end up with
             # a division by 0 and a corresponding nan/inf that needs
             # to be handled correctly
-            H = np.nan_to_num(H, nan=nan_eps, posinf=nan_eps)
+            H = xp.nan_to_num(H, nan=nan_eps, posinf=nan_eps)
 
         # W Step
         if update_W:
             W = W * ((V_X) @ H.T) / ((V * (W @ H - shift)) @ H.T)
-            W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
+            W = xp.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
 
         if return_chi_2:
-            c2 = np.sum((np.sqrt(V) * (X - (W @ H - shift))) ** 2)
+            c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
             chi_2.append(c2)
             if i % 10 == 0:
                 print(i, c2)
@@ -109,8 +146,11 @@ def split_pos_neg(A: npt.ArrayLike):
     numpy.ndarray
         Array of the same shape as A, with positive or zero elements set to 0.
     """
-    A = np.asarray(A)
-    return (np.abs(A) + A) / 2, (np.abs(A) - A) / 2
+    # GPU (cupy) or CPU (numpy)?
+    xp = _get_array_module(A)
+
+    A = xp.asarray(A)
+    return (xp.abs(A) + A) / 2, (xp.abs(A) - A) / 2
 
 
 def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
@@ -155,14 +195,17 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     chi_2 : numpy.ndarray, optional
         The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
+    # GPU (cupy) or CPU (numpy)?
+    xp = _get_array_module(X)
+
     # Copy H and W to avoid mutating the inputs
-    X, V = np.asarray(X), np.asarray(V)
-    H, W = np.array(H_start, copy=True), np.array(W_start, copy=True)
+    X, V = xp.asarray(X), xp.asarray(V)
+    H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
 
     chi_2 = []
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = np.sum((np.sqrt(V) * (X - W @ H)) ** 2)
+        c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
         chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
@@ -173,17 +216,17 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_VX_pos, W_VX_neg = split_pos_neg(W_VX)
 
             H = H * (W_VX_pos) / (W.T @ (V * (W @ H)) + W_VX_neg)
-            H = np.nan_to_num(H, nan=nan_eps, posinf=nan_eps)
+            H = xp.nan_to_num(H, nan=nan_eps, posinf=nan_eps)
         # W-step
         if update_W:
             V_XH = V_X @ H.T
             V_XH_pos, V_XH_neg = split_pos_neg(V_XH)
 
             W = W * (V_XH_pos) / ((V * (W @ H)) @ H.T + V_XH_neg)
-            W = np.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
+            W = xp.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
 
         if return_chi_2:
-            c2 = np.sum((np.sqrt(V) * (X - W @ H)) ** 2)
+            c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
             chi_2.append(c2)
             
             if i % 10 == 0:
@@ -251,6 +294,8 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     chi_2 : numpy.ndarray, optional
         The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
+    # GPU (cupy) or CPU (numpy)?
+    xp = _get_array_module(X)
 
     if (H_start is not None) and (W_start is not None):
         assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
@@ -262,19 +307,22 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     # to ensure we use the same size everywhere
     H_shape = (n_templates, X.shape[1])
     W_shape = (X.shape[0], n_templates)
+
+    # numpy and cupy give different random numbers even with same seed,
+    # so only use numpy for any random numbers, then move to GPU if needed
     rng = np.random.default_rng(100921)
 
     # Randomly initialize the H and W matrices if necessary.
     if H_start is not None:
-        H = np.asarray(H_start)
+        H = xp.asarray(H_start)
     else:
-        H = rng.uniform(0, 2, H_shape)
+        H = xp.asarray(rng.uniform(0, 2, H_shape))
 
 
     if W_start is not None:
-        W = np.asarray(W_start)
+        W = xp.asarray(W_start)
     else:
-        W = rng.uniform(0, 2, W_shape)
+        W = xp.asarray(rng.uniform(0, 2, W_shape))
 
     if algorithm == "shift":
         to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2)
@@ -319,7 +367,10 @@ class NMF:
             fit depending on data size. Defaults to False.
 
         """
-        self.X, self.V = np.asarray(X), np.asarray(V)
+        # GPU (cupy) or CPU (numpy)?
+        xp = _get_array_module(X)
+
+        self.X, self.V = xp.asarray(X), xp.asarray(V)
 
         if (H_start is not None) and (W_start is not None):
             assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
@@ -331,18 +382,20 @@ class NMF:
         # to ensure we use the same size everywhere
         H_shape = (n_templates, X.shape[1])
         W_shape = (X.shape[0], n_templates)
+        # numpy and cupy give different random numbers even with same seed,
+        # so only use numpy for any random numbers, then move to GPU if needed
         self.rng = np.random.default_rng(100921)
 
         # Randomly initialize the H and W matrices if necessary.
         if H_start is not None:
-            self.H = np.asarray(H_start)
+            self.H = xp.asarray(H_start)
         else:
-            self.H = self.rng.uniform(0, 2, H_shape)
+            self.H = xp.asarray(self.rng.uniform(0, 2, H_shape))
 
         if W_start is not None:
-            self.W = np.asarray(W_start)
+            self.W = xp.asarray(W_start)
         else:
-            self.W = self.rng.uniform(0, 2, W_shape)
+            self.W = xp.asarray(self.rng.uniform(0, 2, W_shape))
 
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
@@ -391,5 +444,4 @@ class NMF:
             to a column of X.
         """
         return self.fit_NMF(X, V, self.H, self.W, n_iter=self.n_iter, update_W=False)[0]
-
 
