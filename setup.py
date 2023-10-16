@@ -22,7 +22,7 @@ setup_keywords = dict(
     license='BSD 3-Clause',
     packages=find_packages("py"),
     package_dir={"": "py"},
-    install_requires=['numpy'],
+    install_requires=['numpy>=1.21.0'],
     zip_safe=False,
 )
 
