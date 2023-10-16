@@ -336,11 +336,8 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
 
     if algorithm == "shift":
         to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
-    elif algorithm == "nearly":
-        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
     else:
-        print("Algorithm not found, aborting!")
-        return
+        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
 
     return to_return
 
