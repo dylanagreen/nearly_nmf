@@ -39,7 +39,8 @@ def _get_array_module(data):
 
 def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
-            update_W: bool = True, return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            update_W: bool = True, return_chi_2: bool = False,
+            verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "shift-NMF" algorithm.
 
     WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
@@ -67,6 +68,9 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         Whether to track and return the chi^2 history of the fit. This
         involves computing a matrix norm, so will slightly slow the
         fit depending on data size. Defaults to False.
+    verbose : bool, optional
+        Whether to verbosely print the chi^2 values when tracking. This
+        does nothing if return_chi_2 is False. Defaults to False.
 
     Returns
     -------
@@ -123,7 +127,7 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         if return_chi_2:
             c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
             chi_2.append(c2)
-            if i % 10 == 0:
+            if verbose & (i % 10 == 0):
                 print(i, c2)
 
     if return_chi_2:
@@ -155,7 +159,8 @@ def split_pos_neg(A: npt.ArrayLike):
 
 def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
-            update_W: bool = True, return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            update_W: bool = True, return_chi_2: bool = False,
+            verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "nearly-NMF" algorithm.
 
     WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
@@ -182,6 +187,9 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         Whether to track and return the chi^2 history of the fit. This
         involves computing a matrix norm, so will slightly slow the
         fit depending on data size. Defaults to False.
+    verbose : bool, optional
+        Whether to verbosely print the chi^2 values when tracking. This
+        does nothing if return_chi_2 is False. Defaults to False.
 
     Returns
     -------
@@ -228,8 +236,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
         if return_chi_2:
             c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
             chi_2.append(c2)
-            
-            if i % 10 == 0:
+            if verbose & (i % 10 == 0):
                 print(i, c2)
 
     if return_chi_2:
@@ -241,7 +248,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             W_start: npt.ArrayLike = None, n_templates: int = 2,
             n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, algorithm: str = "shift",
-            return_chi_2: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            return_chi_2: bool = False, verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the specified algorithm.
 
     Parameters
@@ -281,6 +288,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         Whether to track and return the chi^2 history of the fit. This
         involves computing a matrix norm, so will slightly slow the
         fit depending on data size. Defaults to False.
+    verbose : bool, optional
+        Whether to verbosely print the chi^2 values when tracking. This
+        does nothing if return_chi_2 is False. Defaults to False.
 
     Returns
     -------
@@ -325,9 +335,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         W = xp.asarray(rng.uniform(0, 2, W_shape))
 
     if algorithm == "shift":
-        to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2)
+        to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
     elif algorithm == "nearly":
-        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2)
+        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
     else:
         print("Algorithm not found, aborting!")
         return
@@ -338,7 +348,8 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
                  W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
-                 algorithm: str = "shift", return_chi_2: bool = False):
+                 algorithm: str = "shift", return_chi_2: bool = False,
+                 verbose: bool = False):
         """An NMF model object. This object holds all of the relevant NMF algorithmic data, namely
         fitted coefficients and templates/basis vectors for its training dataset.
 
@@ -365,6 +376,9 @@ class NMF:
             Whether to track and return the chi^2 history of the fit. This
             involves computing a matrix norm, so will slightly slow the
             fit depending on data size. Defaults to False.
+        verbose : bool, optional
+            Whether to verbosely print the chi^2 values when tracking. This
+            does nothing if return_chi_2 is False. Defaults to False.
 
         """
         # GPU (cupy) or CPU (numpy)?
@@ -401,6 +415,7 @@ class NMF:
         # object initialization has done sanity checking.
         self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
         self.return_chi_2 = return_chi_2
+        self.verbose = verbose
 
         self.chi_2 = []
         self.n_iter = n_iter
@@ -409,7 +424,9 @@ class NMF:
         """Fit this NMF object to noisy, possibly negative, data with weights.
         """
         if self.return_chi_2:
-            self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter, return_chi_2=self.return_chi_2)
+            self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W,
+                                                      n_iter=self.n_iter, return_chi_2=self.return_chi_2,
+                                                      verbose=self.verbose)
         else:
             self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
 
