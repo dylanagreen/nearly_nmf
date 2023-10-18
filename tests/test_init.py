@@ -39,6 +39,9 @@ class TestInits(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             _ = nmf.fit_NMF(self.X, V, self.H_start, W_break)
+
+        # Separate block because the assertion will prevent it from running otherwise
+        with self.assertRaises(AssertionError):
             _ = nmf.NMF(self.X, V, self.H_start, W_break)
 
     def test_at_least_one_update_true(self):
@@ -46,7 +49,6 @@ class TestInits(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             _ = nmf.fit_NMF(self.X, V, self.H_start, self.W_start, update_H=False, update_W=False)
-            _ = nmf.NMF(self.X, V, self.H_start, self.W_start, update_H=False, update_W=False)
 
 if __name__ == '__main__':
     unittest.main()
