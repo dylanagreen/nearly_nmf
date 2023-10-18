@@ -67,5 +67,47 @@ class TestNoiseFree(unittest.TestCase):
         self.assertTrue(np.allclose(W_nearly, W_shift))
         self.assertTrue(np.allclose(chi_2_shift, chi_2_nearly))
 
+    def test_object_oriented(self):
+        # Previous two tests test the underlying functions
+        # this one tests the object oriented front end that it calls said
+        # methods correctly. If those are passing and this one fails
+        # then the problem is not in the actual algorithm, its in the way
+        # the oop front end is calling them.
+        V = self.rng.uniform(0, 2, self.X.shape)
+        obj_nearly = nmf.NMF(self.X, V, self.H_start, self.W_start,
+                         n_iter=100, algorithm="nearly", return_chi_2=True)
+        obj_shift = nmf.NMF(self.X, V, self.H_start, self.W_start,
+                         n_iter=100, algorithm="shift", return_chi_2=True)
+
+        obj_nearly.fit()
+        obj_shift.fit()
+
+        self.assertTrue(np.allclose(obj_nearly.H, obj_shift.H))
+        self.assertTrue(np.allclose(obj_nearly.W, obj_shift.W))
+        self.assertTrue(np.allclose(obj_nearly.chi_2, obj_shift.chi_2))
+
+    def test_helper_function(self):
+        # Similarly to the previous test, this one tests the helper function
+        # that wraps shift and nearly NMF, rather than the algorithms directly
+        # If those are passing and this one fails
+        # then the problem is not in the actual algorithm, its in the way
+        # the helper function is calling them.
+        V = np.ones_like(self.X)
+        H_nearly, W_nearly, chi_2_nearly = nmf.fit_NMF(self.X, V,
+                                                       self.H_start, self.W_start,
+                                                       n_iter=100,
+                                                       return_chi_2=True,
+                                                       algorithm="nearly")
+        H_shift, W_shift, chi_2_shift = nmf.fit_NMF(self.X, V,
+                                                       self.H_start, self.W_start,
+                                                       n_iter=100,
+                                                       return_chi_2=True,
+                                                       algorithm="shift")
+
+        self.assertTrue(np.allclose(H_nearly, H_shift))
+        self.assertTrue(np.allclose(W_nearly, W_shift))
+        self.assertTrue(np.allclose(chi_2_shift, chi_2_nearly))
+
+
 if __name__ == '__main__':
     unittest.main()
