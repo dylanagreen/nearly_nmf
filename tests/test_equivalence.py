@@ -4,10 +4,12 @@ import numpy as np
 from negative_noise_nmf import nmf
 
 class TestNoiseFree(unittest.TestCase):
+    """
+    This test is for data entirely non-negative. We expect that Nearly-NMF
+    and Shift-NMF should return identical results in this case.
+    """
     def setUp(self):
-         # This test is for data entirely non-negative. We expect that Nearly-NMF
-        # and Shift-NMF should return identical results in this case. All
-        # weights are equal and set to 1.
+        # All weights are equal and set to 1.
 
         self.rng = np.random.default_rng(100921)
 
