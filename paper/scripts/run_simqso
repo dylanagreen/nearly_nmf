@@ -1,0 +1,119 @@
+#!/usr/bin/env python
+
+"""
+Run simqso in parallel
+
+python run_simqso --n_qsos 200000 --n_proc 128 -o qsos.fits
+"""
+
+import time
+import multiprocessing
+import numpy as np
+
+from astropy.cosmology import Planck13
+import astropy.table
+from simqso.sqgrids import *
+from simqso import sqbase
+from simqso.sqrun import buildSpectraBulk,buildQsoSpectrum
+
+from simqso.sqmodels import BOSS_DR9_PLEpivot,get_BossDr9_model_vars
+
+def get_wave(wavemin=3600, wavemax=10000, dloglam=1e-4):
+    """
+    Return logarithmic wavelength array from wavemin to wavemax step dloglam
+
+    Args:
+        wavemin: minimum wavelength
+        wavemax: maximum wavelength
+        dloglam: stepsize in log(wave)
+
+    Return: wave array
+    """
+    n = np.log10(wavemax/wavemin) / dloglam
+    wave = 10**(np.log10(wavemin) + dloglam*np.arange(n))
+    return wave
+
+def simulate_qsos(zin, seed):
+    """
+    Simulate quasar spectra
+
+    Args:
+        zin (array): input redshifts
+        seed (int): random seed
+
+    Returns: (qso_data_table, spectra[nspec,nwave])
+
+    Notes:
+        Uses get_wave() with defaults for wavelength grid.
+        seed, seed+1, and seed+2 are all used
+    """
+    kcorr = sqbase.ContinuumKCorr('DECam-r',1450,effWaveBand='SDSS-r')
+    qsos = generateQlfPoints(BOSS_DR9_PLEpivot(cosmo=Planck13),
+                             (14,22),(0.1, 4),
+                             kcorr=kcorr,zin=zin,
+                             qlfseed=seed,gridseed=seed+1)
+
+    # could pass in wavemin/wavemax/dloglam args if needed...
+    sim_wave = get_wave()
+
+    sedVars = get_BossDr9_model_vars(qsos, sim_wave, noforest=True, forestseed=seed+2)
+    qsos.addVars(sedVars)
+    qsos.loadPhotoMap([('DECam','DECaLS'),('WISE','AllWISE')])
+
+    _, spectra = buildSpectraBulk(sim_wave, qsos, saveSpectra=True, maxIter=5, verbose=0)
+
+    return qsos.data, spectra
+
+#-------------------------------------------------------------------------
+
+import argparse
+p = argparse.ArgumentParser()
+p.add_argument('--n_qsos', type=int, default=1024, help="Number of QSOs to generate")
+p.add_argument('--n_proc', type=int, default=16, help="Number of parallel processes to use")
+p.add_argument('--seed', type=int, default=1234, help="Random seed")
+p.add_argument('--zmin', type=float, default=0.0, help="Minimum redshift")
+p.add_argument('--zmax', type=float, default=4.0, help="Maximum redshift")
+p.add_argument('-o', '--outfile', type=str, help="Output filename")
+
+args = p.parse_args()
+
+#- extract args for easier cutting-and-pasting
+n_qsos = args.n_qsos
+n_proc = args.n_proc
+seed = args.seed
+zmin, zmax = args.zmin, args.zmax
+
+n_qsos_per_proc = n_qsos // n_proc
+
+rng = np.random.default_rng(seed)
+zin = rng.uniform(zmin, zmax, n_qsos)
+
+# split zin into separate arrays per process
+zin_proc = np.array_split(zin, n_proc)
+
+# groups (zin_per_proc, seed_per_proc)
+arg_list = zip(zin_proc, seed + 10*np.arange(n_proc))
+
+print(f'Generating {n_qsos=} with {n_proc=}')
+with multiprocessing.Pool(n_proc) as pool:
+    results = pool.starmap(simulate_qsos, arg_list)
+
+qsodata = astropy.table.vstack([tmp[0] for tmp in results])
+spectra = np.concatenate([tmp[1] for tmp in results])
+
+if args.outfile:
+    hdr = fits.Header(dict(SEED=seed, ZMIN=zmin, ZMAX=zmax))
+    from astropy.io import fits
+    hdus = fits.HDUList()
+    hdus.append(fits.ImageHDU(get_wave(), header=hdr, name='WAVELENGTH'))
+    hdus.append(fits.ImageHDU(spectra, name='FLUX'))
+    qsodata.meta['EXTNAME'] = 'METADATA'
+    hdus.append(fits.convenience.table_to_hdu(qsodata))
+    hdus.writeto(args.outfile, overwrite=True)
+    print(f'Wrote {args.outfile}')
+
+
+
+
+
+
