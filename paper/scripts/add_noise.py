@@ -48,9 +48,8 @@ def deshift_and_stack(fl, redshifts, w_obs):
         z = redshifts[i]
         shifted_wave = w_obs / (1 + z)
         
-        # Normalize to "approximately median of 1 in erg space" then
-        # convert to photon space for poisson sampling
-        X.append(fl[i] / np.median(fl[i]) * shifted_wave)
+        ergs_to_photons = shifted_wave / np.gradient(shifted_wave)
+        X.append(fl[i] * ergs_to_photons)
         waves.append(shifted_wave)
         
     return X, waves
@@ -164,56 +163,50 @@ def rebin_to_common(w_in, w_out, fl, iv, fl_idx):
     return fl_out, iv_out * mask, mask
 
 
-def add_noise(fl, seed, add_noise=True):
+def add_noise(fl_shift, w_shift, seed):
+    # TODO Vectorize this?
     rng = np.random.default_rng(seed)
     fl_noisy = []
     iv_noisy = []
     
-    poisson = add_noise
+    fl_noise_free = []
+    iv_noise_free = []
     # gaussian = add_noise
     
     for i in range(len(fl_shift)):
-        # # Pick an SNR between 0.5 and 1.5 so the mean SNR is vaguely 1
-        # signal = np.mean(fl_shift[i] ** 2)
-        # snr_choice = rng.uniform(0.5, 1.5)
-        # noise_sigma = np.sqrt(signal) / snr_choice
-        # noise = rng.normal(0, noise_sigma, fl_shift[i].shape)
+        ergs_to_photons = w_shift[i] / np.gradient(w_shift[i])
+        
+        num_photons = rng.uniform(50, 100)
+        fl_scale = fl_shift[i] * num_photons / np.median(fl_shift[i])
 
-        if poisson:
-            x_poisson = rng.poisson(fl_shift[i].clip(min=0))
-        else:
-            x_poisson = fl_shift[i]
+        x_poisson = rng.poisson(fl_scale.clip(min=0))
 
+            
         # Estimating the variance from the poisson sim
-        # var_poisson = x_poisson / w_shift[i]
-        # var_noise = (noise_sigma / w_shift[i]) ** 2
+        x_poisson = x_poisson / ergs_to_photons
+        var_poisson = fl_scale / ergs_to_photons
         
-        # Pick an SNR between 0.5 and 1.5 so the mean SNR is vaguely 1
-        x_poisson = x_poisson / w_shift[i]
-        var_poisson = x_poisson
-        
-        # Pick an SNR between 0.5 and 1.5 so the mean SNR is vaguely 1
-        signal = np.mean(x_poisson ** 2)
-        snr_choice = rng.uniform(0.5, 1.5)
+        # Pick an SNR between 1 and 2 so the mean SNR is vaguely 1.5
+        # This corresponds roughly with 10% negativity.
+        # Basing signal on var poisson which is based on the truth allows
+        # us to base the signal on the noise-free truth for accuracy
+        signal = np.mean(var_poisson ** 2)
+        snr_choice = rng.uniform(1, 2)
         noise_sigma = np.sqrt(signal) / snr_choice
         noise = rng.normal(0, noise_sigma, fl_shift[i].shape)
         var_noise = noise_sigma ** 2
 
-        # Remember these are inverse variances so w_shift goes on top for
-        # conversion to ergspace
-        if add_noise:
-            fl_sim = x_poisson + noise
-            iv_noisy.append(1 / (var_poisson + var_noise))
-        else:
-            fl_sim = fl_shift[i] / w_shift[i]
-            iv_noisy.append((fl_sim != 0))
-
+        fl_sim = x_poisson + noise
+        iv_noisy.append(1 / (var_poisson + var_noise))
         fl_noisy.append(fl_sim)
         
-    return fl_noisy, iv_noisy
+        fl_noise_free.append(fl_scale / ergs_to_photons)
+        iv_noise_free.append((fl_scale != 0))
+        
+    return fl_noisy, iv_noisy, fl_noise_free, iv_noise_free
 
 
-def rebin_all(fl, iv, waves, w_rest, w_scale, spectra_for_norm, renorm=True, add_noise=True):
+def rebin_all(fl, iv, waves, w_rest, w_scale, spectra_for_norm, renorm=True, has_noise=True):
     fl_rebinned = []
     iv_rebinned = []
     masks = []
@@ -243,7 +236,7 @@ def rebin_all(fl, iv, waves, w_rest, w_scale, spectra_for_norm, renorm=True, add
             
             fl_rebinned.append(normed)
             masks.append(m)
-            if add_noise:
+            if has_noise:
                 iv_rebinned.append(normed_iv)
             else:
                 iv_rebinned.append(m.astype(float))
@@ -256,12 +249,13 @@ import argparse
 p = argparse.ArgumentParser()
 p.add_argument('--seed', type=int, default=1234, help="Random seed")
 p.add_argument('-o', '--out', type=str, help="Output filename")
+p.add_argument('-i', '--in_file', type=str, help="Filename of generated simqso quasars")
 p.add_argument('--renorm', action="store_true", help="Whether to renormalize or not.")
-p.add_argument('--add_noise', action="store_true", help="Whether to add noise or not.")
+# p.add_argument('--add_noise', action="store_true", help="Whether to add noise or not.")
 
 args = p.parse_args()
 
-print(args.add_noise)
+# print(args.add_noise)
 print(args.renorm)
 
 # All sorts of settable hyperparameters
@@ -286,8 +280,8 @@ if len(w_rest) == 11401: w_rest = w_rest[:-1] # Odd number fix
 l_min = np.log10(w_rest[0])
 l_max = np.log10(w_rest[-1])
 
-with fitsio.FITS("qsos.fits") as h:
-    fl = h["FLUX"].read()
+with fitsio.FITS(args.in_file) as h:
+    fl = h["FLUX"][:10000, :]#.read()
     w_obs = h["WAVELENGTH"].read()
     redshifts = h["METADATA"].read("Z")
 
@@ -295,7 +289,7 @@ print("Deshifting spectra...")
 fl_shift, w_shift = deshift_and_stack(fl, redshifts, w_obs)
 
 print("Adding noise...")
-fl_noisy, iv_noisy = add_noise(fl_shift, args.seed, add_noise=args.add_noise)
+fl_noisy, iv_noisy, fl_noise_free, iv_noise_free = add_noise(fl_shift, w_shift, args.seed)
 
 if args.renorm:
     print("Generating scaling spectra...")  
@@ -303,29 +297,45 @@ if args.renorm:
 else:
     spectra_for_norm = None
 print("Rebinning spectra...")  
-fl_rebinned, iv_rebinned, masks = rebin_all(fl_noisy, iv_noisy, w_shift, w_rest, w_scale, spectra_for_norm, renorm=args.renorm, add_noise=args.add_noise)
-            
+fl_rebinned, iv_rebinned, masks = rebin_all(fl_noisy, iv_noisy, w_shift, w_rest, w_scale, spectra_for_norm, renorm=args.renorm, has_noise=True)
 X = np.vstack(fl_rebinned).T
 V = np.vstack(iv_rebinned).T
 
+fl_rebinned, iv_rebinned, masks = rebin_all(fl_noise_free, iv_noise_free, w_shift, w_rest, w_scale, spectra_for_norm, renorm=args.renorm, has_noise=False)
+X_truth = np.vstack(fl_rebinned).T
+V_truth = np.vstack(iv_rebinned).T
+
 print("post tests")
 print(np.where(~X.any(axis=0))[0])
-print(np.any(X[:, 4119]))
 
 # Just in case we have a divide by zero error
 V = np.nan_to_num(V, nan=0, posinf=0)
 X = np.nan_to_num(X, nan=0, posinf=0)
 
+# Just in case we have a divide by zero error
+V_truth = np.nan_to_num(V_truth, nan=0, posinf=0)
+X_truth = np.nan_to_num(X_truth, nan=0, posinf=0)
+
 print(np.where(~X.any(axis=0))[0])
-print(np.any(X[:, 4119]))
 
 print("Negative fraction:", np.sum(X < 0) / (X[V != 0].size))
 print("Missing fraction:", 1 - (np.sum(V != 0) / V.size))
 
-print("Saving spectra...")
-if os.path.isfile(args.out): os.remove(args.out)
-with fitsio.FITS(args.out, "rw") as h:
+
+save_name = f"{args.out}_noisy.fits"
+print(f"Saving {save_name}...")
+if os.path.isfile(save_name): os.remove(save_name)
+with fitsio.FITS(save_name, "rw") as h:
     h.write(X, extname="FLUX")
     h.write(V, extname="IVAR")
+    h.write(w_rest, extname="WAVELENGTH")
+    h.write(redshifts, extname="Z")
+    
+save_name = f"{args.out}_noiseless.fits"
+print(f"Saving {save_name}...")
+if os.path.isfile(save_name): os.remove(save_name)
+with fitsio.FITS(save_name, "rw") as h:
+    h.write(X_truth, extname="FLUX")
+    h.write(V_truth, extname="IVAR")
     h.write(w_rest, extname="WAVELENGTH")
     h.write(redshifts, extname="Z")
