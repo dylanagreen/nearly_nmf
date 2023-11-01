@@ -2,7 +2,7 @@ import unittest
 import pathlib
 
 import numpy as np
-from negative_noise_nmf import nmf
+from nearly_nmf import nmf
 
 file_loc = pathlib.Path(__file__).parent.resolve() / "test_data"
 

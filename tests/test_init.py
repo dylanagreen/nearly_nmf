@@ -1,7 +1,7 @@
 import unittest
 
 import numpy as np
-from negative_noise_nmf import nmf
+from nearly_nmf import nmf
 
 class TestInits(unittest.TestCase):
     def setUp(self):

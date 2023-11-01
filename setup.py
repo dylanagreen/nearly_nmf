@@ -2,7 +2,7 @@ import os, sys, glob, re
 from setuptools import setup, find_packages
 
 def _get_version():
-    line = open('py/negative_noise_nmf/_version.py').readline().strip()
+    line = open('py/nearly_nmf/_version.py').readline().strip()
     m = re.match("__version__\s*=\s*'(.*)'", line)
     if m is None:
         print('ERROR: Unable to parse version from: {}'.format(line))
@@ -13,10 +13,10 @@ def _get_version():
     return version
 
 setup_keywords = dict(
-    name='negative_noise_nmf',
+    name='nearly_nmf',
     version=_get_version(),
     description='Algorithms for generating NMF templates from noisy data with negative values.',
-    url='https://github.com/dylanagreen/nmf_with_negative_data',
+    url='https://github.com/dylanagreen/nearly_nmf',
     author='Dylan Green',
     author_email='dylanag@uci.edu',
     license='BSD 3-Clause',
