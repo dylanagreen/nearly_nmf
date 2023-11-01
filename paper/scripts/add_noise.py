@@ -89,46 +89,18 @@ def rebin_to_common(w_in, w_out, fl, iv, fl_idx):
     # Since both grids are on the exact same spacing
     # this is just a matter of finding how much the two
     # bins overlap each other by.
-    idx_in = np.argmax(w_in > l_min)
-    idx_out = np.argmax(w_out > w_in[idx_in])
-    d_low = w_out[idx_out] - w_in[idx_in]
-    d_high = w_in[idx_in + 1] - w_out[idx_out]
+    # Pick the midpoint of the input array which based on how
+    # we set up the output array should always be within the grid
+    # and not near the output edges
+    # Then find the two bin edges on either side that contain this midpoint.
+    base = w_in[len(w_in) // 2]
+    idx_above = np.argmax(w_out > base)
+    idx_below = idx_above - 1
     
-    # Gets the bin in the output grid that includes the lower edge 
-    # of the input grid. Can add one for upper edge since
-    # both grids have the same spacing.
-    bin_low = np.floor((w_in - l_min) / dl).astype(int)
-    good_low = (bin_low >= 0) & (bin_low < nbins_final)
-    bin_high = bin_low + 1
-    good_high = (bin_high >= 0) & (bin_high < nbins_final)
+    assert w_out[idx_below] < base
+    d_high = w_out[idx_above] - base
+    d_low = base - w_out[idx_below]
     
-    # Not enough of this grid actually falls into the common grid
-    if not np.any(good_low) or not np.any(good_high):
-        return None, None
-
-    # If the grid exactly aligns with the bottom of the common grid
-    if np.min(bin_low[good_low]) == 0:
-        base = w_out[0]
-        idx_in = np.argmax(w_in[1:] > l_min)
-        idx_out = np.argmax(w_out > w_in[idx_in]) - 1
-        
-        # Need to handle this case because subtracting 1
-        # will roll it over to the end of the array
-        if idx_in == -1: 
-            idx_in += 1
-            idx_out += 1
-            base = w_out[idx_out]
-            
-        d_low = base - w_in[idx_in]
-        d_high = w_in[idx_in + 1] - base
-        
-    # If the grid overlaps the edge of the upper end of the grid
-    elif np.max(bin_high[good_high]) == (len(w_out) - 1):
-        idx_in = np.argmax(w_in > w_out[-1]) - 1
-        idx_out = -1 #np.argmax(w_out > w_in[idx_in]) - 1
-        d_low = w_out[idx_out] - w_in[idx_in]
-        d_high = w_in[idx_in + 1] - w_out[idx_out]
-        
     percent_low = d_low / dl
     percent_high = d_high / dl
 
@@ -137,6 +109,14 @@ def rebin_to_common(w_in, w_out, fl, iv, fl_idx):
     nz = iv != 0
     var[nz] = 1 / var[nz]
 
+    # Gets the bin number in the output grid that includes the lower edge 
+    # of the bins in the input grid. 
+    # Can add 1 for upper edge since both grids have the same spacing.
+    bin_low = np.floor((w_in - l_min) / dl).astype(int)
+    good_low = (bin_low >= 0) & (bin_low < nbins_final)
+    bin_high = bin_low + 1
+    good_high = (bin_high >= 0) & (bin_high < nbins_final)
+        
     c_low = np.bincount(bin_low[good_low], weights=fl[good_low] * percent_low, minlength=len(w_out))
     c_high = np.bincount(bin_high[good_high], weights=fl[good_high] * percent_high, minlength=len(w_out))
     
@@ -157,10 +137,11 @@ def rebin_to_common(w_in, w_out, fl, iv, fl_idx):
     # Inverting the variance back to inverse variance
     var_out = var_low + var_high
     iv_out = var_out
-    nz = np.abs(var_out) > 1e-2 # Mitigating small factor errors
+    # nz = np.abs(var_out) > 1e-2 # Mitigating small factor errors
+    nz = var_out != 0
     iv_out[nz] = 1 / var_out[nz]
 
-    return fl_out, iv_out * mask, mask
+    return fl_out * mask, iv_out * mask, mask
 
 
 def add_noise(fl_shift, w_shift, seed):
@@ -176,7 +157,7 @@ def add_noise(fl_shift, w_shift, seed):
     for i in range(len(fl_shift)):
         ergs_to_photons = w_shift[i] / np.gradient(w_shift[i])
         
-        num_photons = rng.uniform(50, 100)
+        num_photons = rng.uniform(10, 40)
         fl_scale = fl_shift[i] * num_photons / np.median(fl_shift[i])
 
         x_poisson = rng.poisson(fl_scale.clip(min=0))
@@ -184,13 +165,13 @@ def add_noise(fl_shift, w_shift, seed):
             
         # Estimating the variance from the poisson sim
         x_poisson = x_poisson / ergs_to_photons
-        var_poisson = fl_scale / ergs_to_photons
+        var_poisson = fl_scale / (ergs_to_photons ** 2)
         
         # Pick an SNR between 1 and 2 so the mean SNR is vaguely 1.5
         # This corresponds roughly with 10% negativity.
-        # Basing signal on var poisson which is based on the truth allows
-        # us to base the signal on the noise-free truth for accuracy
-        signal = np.mean(var_poisson ** 2)
+        # Basing signal on the noise-free truth for accuracy
+        fl_true = fl_scale / ergs_to_photons
+        signal = np.mean(fl_true ** 2)
         snr_choice = rng.uniform(1, 2)
         noise_sigma = np.sqrt(signal) / snr_choice
         noise = rng.normal(0, noise_sigma, fl_shift[i].shape)
@@ -200,7 +181,7 @@ def add_noise(fl_shift, w_shift, seed):
         iv_noisy.append(1 / (var_poisson + var_noise))
         fl_noisy.append(fl_sim)
         
-        fl_noise_free.append(fl_scale / ergs_to_photons)
+        fl_noise_free.append(fl_true)
         iv_noise_free.append((fl_scale != 0))
         
     return fl_noisy, iv_noisy, fl_noise_free, iv_noise_free
@@ -281,7 +262,7 @@ l_min = np.log10(w_rest[0])
 l_max = np.log10(w_rest[-1])
 
 with fitsio.FITS(args.in_file) as h:
-    fl = h["FLUX"][:10000, :]#.read()
+    fl = h["FLUX"].read()
     w_obs = h["WAVELENGTH"].read()
     redshifts = h["METADATA"].read("Z")
 
@@ -311,8 +292,6 @@ print(np.where(~X.any(axis=0))[0])
 # Just in case we have a divide by zero error
 V = np.nan_to_num(V, nan=0, posinf=0)
 X = np.nan_to_num(X, nan=0, posinf=0)
-
-# Just in case we have a divide by zero error
 V_truth = np.nan_to_num(V_truth, nan=0, posinf=0)
 X_truth = np.nan_to_num(X_truth, nan=0, posinf=0)
 
