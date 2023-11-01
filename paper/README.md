@@ -11,5 +11,5 @@ The following is the process to generate the data and train templates used in th
 
 1. Generate 200k simqso qsos: `python run_simqso --seed 100921 --n_qsos 200000 --n_proc 128 -o qsos.fits`
 2. Generate the noisy qsos and their corresponding rebinned and rescaled noise-free truths: `python add_noise.py --seed 100921 -o qsos -i qsos.fits --renorm`
-3. Train the templates: `python train_templates.py --seed 100921 -i qsos_noisy.fits -o noisy --validate --algorithm both` to train both Nearly and Shift-NMF on the noiseless dataset, saving with the suffix "noiseless", and including fitting the templates to the validation dataset. Repeat the same commend with `noiseless` in place of `noisy` to fit to the noise-free truth dataset.
+3. Train the templates: `python train_templates.py --seed 100921 -i qsos_noisy.fits -o noisy --validate --algorithm both` to train both Nearly and Shift-NMF on the noiseless dataset, saving with the suffix "noisy", and including fitting the templates to the validation dataset. Repeat the same commend with `noiseless` in place of `noisy` to fit to the noise-free truth dataset.
 4. Use the NNLS solver to fit the trained templates to the validation dataset with `python chi_2.py -i qsos_noisy.fits`.
