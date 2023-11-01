@@ -247,7 +247,7 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
 def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             W_start: npt.ArrayLike = None, n_templates: int = 2,
             n_iter: int = 500, update_H: bool = True,
-            update_W: bool = True, algorithm: str = "shift",
+            update_W: bool = True, algorithm: str = "nearly",
             return_chi_2: bool = False, verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the specified algorithm.
 
@@ -277,12 +277,12 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         Whether to update W when running the iteration. Set to False
         to fit only coefficients with the given templates. Defaults to True.
     algorithm : {"shift", "nearly"}, optional
-        The algorithm to use to do the fit.
+        The algorithm to use to do the fit. Defaults to "nearly".
             * "shift" : Uses the shift-NMF algorithm, where all data is shifted
             to the nonnegative half plane and NMF is fitted with a fixed
             template/coefficient pair accounting for the shift.
             * "nearly" : Uses the nearly-NMF algorithm, where the positive
-            and negative components of the input data are seperated and accounted
+            and negative components of the input data are separated and accounted
             for separately in the update rules.
     return_chi_2 : bool, optional
         Whether to track and return the chi^2 history of the fit. This
@@ -345,7 +345,7 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
 class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
                  W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
-                 algorithm: str = "shift", return_chi_2: bool = False,
+                 algorithm: str = "nearly", return_chi_2: bool = False,
                  verbose: bool = False):
         """An NMF model object. This object holds all of the relevant NMF algorithmic data, namely
         fitted coefficients and templates/basis vectors for its training dataset.
@@ -369,6 +369,14 @@ class NMF:
             a starting matrix for H or W. Defaults to 2.
         n_iter : int, optional
             Number of fitting iterations to run. Defaults to 500.
+        algorithm : {"shift", "nearly"}, optional
+            The algorithm to use to do the fit. Defaults to "nearly".
+            * "shift" : Uses the shift-NMF algorithm, where all data is shifted
+            to the nonnegative half plane and NMF is fitted with a fixed
+            template/coefficient pair accounting for the shift.
+            * "nearly" : Uses the nearly-NMF algorithm, where the positive
+            and negative components of the input data are separated and accounted
+            for separately in the update rules.
         return_chi_2 : bool, optional
             Whether to track and return the chi^2 history of the fit. This
             involves computing a matrix norm, so will slightly slow the
