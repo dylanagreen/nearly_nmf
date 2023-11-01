@@ -80,7 +80,7 @@ if train_shift:
 
 print("Starting iteration")
 for i in range(args.n_templates):
-    print("iteration", i + 1, H_shift[:(i + 1), :].shape)
+    print("iteration", i + 1)
     if train_nearly:
         t1 = time.time()
         # Earlier templates do not get fixed so will get the cumulative amount of
@@ -116,11 +116,13 @@ t3 = time.time()
 print(t2 - t1, t3 - t2)
 
 print("Saving templates")
-cp.save(f"templates_no_scale/W_nearly_{args.out_suffix}.npy", W_nearly)
-cp.save(f"templates_no_scale/H_nearly_{args.out_suffix}.npy", H_nearly)
+if train_nearly:
+    cp.save(f"templates/W_nearly_{args.out_suffix}.npy", W_nearly)
+    cp.save(f"templates/H_nearly_{args.out_suffix}.npy", H_nearly)
 
-cp.save(f"templates_no_scale/W_shift_{args.out_suffix}.npy", W_shift)
-cp.save(f"templates_no_scale/H_shift_{args.out_suffix}.npy", H_shift)
+if train_shift:
+    cp.save(f"templates/W_shift_{args.out_suffix}.npy", W_shift)
+    cp.save(f"templates/H_shift_{args.out_suffix}.npy", H_shift)
 
 if args.validate:
     with fitsio.FITS(args.in_file, "r") as h:
@@ -148,6 +150,6 @@ if args.validate:
     print(t2 - t1, t3 - t2)
 
     print("Saving validation coefficients")
-    cp.save(f"templates_no_scale/H_nearly_{args.out_suffix}_validate.npy", H_nearly)
-    cp.save(f"templates_no_scale/H_shift_{args.out_suffix}_validate.npy", H_shift)
+    cp.save(f"templates/H_nearly_{args.out_suffix}_validate.npy", H_nearly)
+    cp.save(f"templates/H_shift_{args.out_suffix}_validate.npy", H_shift)
 
