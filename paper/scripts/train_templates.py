@@ -5,7 +5,7 @@ import cupy as cp
 
 import sys
 sys.path.insert(0, "../../py/")
-from negative_noise_nmf import nmf
+from nearly_nmf import nmf
 
 import time
 import argparse
