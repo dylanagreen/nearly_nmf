@@ -346,13 +346,19 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     # GPU (cupy) or CPU (numpy)?
     xp = _get_array_module(X)
 
-    if transpose:
-        assert H_start.shape[1] == W_start.shape[0], "Number of templates does not match between H and W"
-    else:
-        assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
+    if (H_start is not None) and (W_start is not None):
+        if transpose:
+            assert H_start.shape[1] == W_start.shape[0], "Number of templates does not match between H and W"
+        else:
+            assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
     assert (update_H or update_W), "At least one of update_H or update_W must be True"
-    if H_start is not None: n_templates = H_start.shape[0]
-    elif W_start is not None: n_templates = W_start.shape[1]
+
+    if transpose:
+        if H_start is not None: n_templates = H_start.shape[1]
+        elif W_start is not None: n_templates = W_start.shape[0]
+    else:
+        if H_start is not None: n_templates = H_start.shape[0]
+        elif W_start is not None: n_templates = W_start.shape[1]
 
     # Size of the coefficients and templates respectively
     # to ensure we use the same size everywhere
@@ -451,9 +457,13 @@ class NMF:
                 assert H_start.shape[1] == W_start.shape[0], "Number of templates does not match between H and W"
             else:
                 assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
-        if H_start is not None: self.n_templates = H_start.shape[0]
-        elif W_start is not None: self.n_templates = W_start.shape[1]
-        else: self.n_templates = n_templates
+        self.n_templates = n_templates
+        if transpose:
+            if H_start is not None: self.n_templates = H_start.shape[1]
+            elif W_start is not None: self.n_templates = W_start.shape[0]
+        else:
+            if H_start is not None: self.n_templates = H_start.shape[0]
+            elif W_start is not None: self.n_templates = W_start.shape[1]
 
         # Size of the coefficients and templates respectively
         # to ensure we use the same size everywhere
@@ -464,8 +474,8 @@ class NMF:
             n_obs = X.shape[1]
             n_dim = X.shape[0]
 
-        H_shape = (n_templates, n_obs)
-        W_shape = (n_dim, n_templates)
+        H_shape = (self.n_templates, n_obs)
+        W_shape = (n_dim, self.n_templates)
         # numpy and cupy give different random numbers even with same seed,
         # so only use numpy for any random numbers, then move to GPU if needed
         self.rng = np.random.default_rng(100921)
