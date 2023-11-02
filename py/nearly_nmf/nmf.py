@@ -40,7 +40,7 @@ def _get_array_module(data):
 def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, return_chi_2: bool = False,
-            verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            verbose: bool = False, transpose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "shift-NMF" algorithm.
 
     WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
@@ -71,6 +71,10 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     verbose : bool, optional
         Whether to verbosely print the chi^2 values when tracking. This
         does nothing if return_chi_2 is False. Defaults to False.
+    transpose : bool, optional
+        Whether or not to train in "transposed" form, where the observations
+        are the rows of X rather than the columns. Note that this
+        flips the dimensions for all input arrays. Defaults to False.
 
     Returns
     -------
@@ -88,8 +92,14 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     xp = _get_array_module(X)
 
     # Copy H and W to avoid mutating the inputs
-    X, V = xp.asarray(X), xp.asarray(V)
-    H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
+    # If transposed we'll just transpose it, train, and then return transposed
+    # back to the input direction
+    if transpose:
+        X, V = xp.asarray(X).T, xp.asarray(V).T
+        H, W = xp.array(H_start, copy=True).T, xp.array(W_start, copy=True).T
+    else:
+        X, V = xp.asarray(X), xp.asarray(V)
+        H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
 
     chi_2 = []
     # Only shift if the lowest value of X is negative, otherwise
@@ -104,7 +114,8 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
 
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
+        recon = W @ H
+        c2 = xp.sum((xp.sqrt(V) * (X - (recon - shift))) ** 2)
         chi_2.append(c2)
 
     V_X = V * X # Weighted X, outside the loop for efficiency
@@ -125,10 +136,16 @@ def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = xp.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
 
         if return_chi_2:
-            c2 = xp.sum((xp.sqrt(V) * (X - (W @ H - shift))) ** 2)
+            recon = W @ H
+            c2 = xp.sum((xp.sqrt(V) * (X - (recon - shift))) ** 2)
             chi_2.append(c2)
             if verbose & (i % 10 == 0):
                 print(i, c2)
+
+    # Transposing back for returns
+    if transpose:
+        H = H.T
+        W = W.T
 
     if return_chi_2:
         return H, W, chi_2
@@ -160,7 +177,7 @@ def split_pos_neg(A: npt.ArrayLike):
 def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, return_chi_2: bool = False,
-            verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            verbose: bool = False, transpose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the "nearly-NMF" algorithm.
 
     WARNING: This function will do no sanity checking of inputs. It is highly recommended to use `fit_NMF`
@@ -190,6 +207,10 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     verbose : bool, optional
         Whether to verbosely print the chi^2 values when tracking. This
         does nothing if return_chi_2 is False. Defaults to False.
+    transpose : bool, optional
+        Whether or not to train in "transposed" form, where the observations
+        are the rows of X rather than the columns. Note that this
+        flips the dimensions for all input arrays. Defaults to False.
 
     Returns
     -------
@@ -207,13 +228,20 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
     xp = _get_array_module(X)
 
     # Copy H and W to avoid mutating the inputs
-    X, V = xp.asarray(X), xp.asarray(V)
-    H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
+    # If transposed we'll just transpose it, train, and then return transposed
+    # back to the input direction
+    if transpose:
+        X, V = xp.asarray(X).T, xp.asarray(V).T
+        H, W = xp.array(H_start, copy=True).T, xp.array(W_start, copy=True).T
+    else:
+        X, V = xp.asarray(X), xp.asarray(V)
+        H, W = xp.array(H_start, copy=True), xp.array(W_start, copy=True)
 
     chi_2 = []
     # The initial chi^2 pre fitting
     if return_chi_2:
-        c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
+        recon = W @ H
+        c2 = xp.sum((xp.sqrt(V) * (X - recon)) ** 2)
         chi_2.append(c2)
     # Precomputing some values for efficiency
     V_X = V * X
@@ -234,10 +262,16 @@ def nearly_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W = xp.nan_to_num(W, nan=nan_eps, posinf=nan_eps)
 
         if return_chi_2:
-            c2 = xp.sum((xp.sqrt(V) * (X - W @ H)) ** 2)
+            recon = W @ H
+            c2 = xp.sum((xp.sqrt(V) * (X - recon)) ** 2)
             chi_2.append(c2)
             if verbose & (i % 10 == 0):
                 print(i, c2)
+
+    # Transposing back for returns
+    if transpose:
+        H = H.T
+        W = W.T
 
     if return_chi_2:
         return H, W, chi_2
@@ -248,7 +282,8 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             W_start: npt.ArrayLike = None, n_templates: int = 2,
             n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, algorithm: str = "nearly",
-            return_chi_2: bool = False, verbose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            return_chi_2: bool = False, verbose: bool = False,
+            transpose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the specified algorithm.
 
     Parameters
@@ -291,6 +326,10 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     verbose : bool, optional
         Whether to verbosely print the chi^2 values when tracking. This
         does nothing if return_chi_2 is False. Defaults to False.
+    transpose : bool, optional
+        Whether or not to train in "transposed" form, where the observations
+        are the rows of X rather than the columns. Note that this
+        flips the dimensions for all input arrays. Defaults to False.
 
     Returns
     -------
@@ -307,7 +346,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     # GPU (cupy) or CPU (numpy)?
     xp = _get_array_module(X)
 
-    if (H_start is not None) and (W_start is not None):
+    if transpose:
+        assert H_start.shape[1] == W_start.shape[0], "Number of templates does not match between H and W"
+    else:
         assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
     assert (update_H or update_W), "At least one of update_H or update_W must be True"
     if H_start is not None: n_templates = H_start.shape[0]
@@ -315,8 +356,14 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
 
     # Size of the coefficients and templates respectively
     # to ensure we use the same size everywhere
-    H_shape = (n_templates, X.shape[1])
-    W_shape = (X.shape[0], n_templates)
+    if transpose:
+        n_obs = X.shape[0]
+        n_dim = X.shape[1]
+    else:
+        n_obs = X.shape[1]
+        n_dim = X.shape[0]
+    H_shape = (n_templates, n_obs)
+    W_shape = (n_dim, n_templates)
 
     # numpy and cupy give different random numbers even with same seed,
     # so only use numpy for any random numbers, then move to GPU if needed
@@ -327,17 +374,21 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         H = xp.asarray(H_start)
     else:
         H = xp.asarray(rng.uniform(0, 2, H_shape))
+        # If we initialized, transpose to be of the "expected" form for
+        # transpose.
+        if transpose: H = H.T
 
 
     if W_start is not None:
         W = xp.asarray(W_start)
     else:
         W = xp.asarray(rng.uniform(0, 2, W_shape))
+        if transpose: W = W.T
 
     if algorithm == "shift":
-        to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
+        to_return = shift_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose, transpose)
     else:
-        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose)
+        to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose, transpose)
 
     return to_return
 
@@ -346,7 +397,7 @@ class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
                  W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
                  algorithm: str = "nearly", return_chi_2: bool = False,
-                 verbose: bool = False):
+                 verbose: bool = False, transpose: bool = False):
         """An NMF model object. This object holds all of the relevant NMF algorithmic data, namely
         fitted coefficients and templates/basis vectors for its training dataset.
 
@@ -384,6 +435,10 @@ class NMF:
         verbose : bool, optional
             Whether to verbosely print the chi^2 values when tracking. This
             does nothing if return_chi_2 is False. Defaults to False.
+        transpose : bool, optional
+            Whether or not to train in "transposed" form, where the observations
+            are the rows of X rather than the columns. Note that this
+            flips the dimensions for all input arrays. Defaults to False.
 
         """
         # GPU (cupy) or CPU (numpy)?
@@ -392,29 +447,42 @@ class NMF:
         self.X, self.V = xp.asarray(X), xp.asarray(V)
 
         if (H_start is not None) and (W_start is not None):
-            assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
+            if transpose:
+                assert H_start.shape[1] == W_start.shape[0], "Number of templates does not match between H and W"
+            else:
+                assert H_start.shape[0] == W_start.shape[1], "Number of templates does not match between H and W"
         if H_start is not None: self.n_templates = H_start.shape[0]
         elif W_start is not None: self.n_templates = W_start.shape[1]
         else: self.n_templates = n_templates
 
         # Size of the coefficients and templates respectively
         # to ensure we use the same size everywhere
-        H_shape = (n_templates, X.shape[1])
-        W_shape = (X.shape[0], n_templates)
+        if transpose:
+            n_obs = X.shape[0]
+            n_dim = X.shape[1]
+        else:
+            n_obs = X.shape[1]
+            n_dim = X.shape[0]
+
+        H_shape = (n_templates, n_obs)
+        W_shape = (n_dim, n_templates)
         # numpy and cupy give different random numbers even with same seed,
         # so only use numpy for any random numbers, then move to GPU if needed
         self.rng = np.random.default_rng(100921)
+        self.transpose = transpose
 
         # Randomly initialize the H and W matrices if necessary.
         if H_start is not None:
             self.H = xp.asarray(H_start)
         else:
             self.H = xp.asarray(self.rng.uniform(0, 2, H_shape))
+            if transpose: self.H = self.H.T
 
         if W_start is not None:
             self.W = xp.asarray(W_start)
         else:
             self.W = xp.asarray(self.rng.uniform(0, 2, W_shape))
+            if transpose: self.W = self.W.T
 
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
@@ -431,9 +499,10 @@ class NMF:
         if self.return_chi_2:
             self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W,
                                                       n_iter=self.n_iter, return_chi_2=self.return_chi_2,
-                                                      verbose=self.verbose)
+                                                      verbose=self.verbose, transpose=self.transpose)
         else:
-            self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W, n_iter=self.n_iter)
+            self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W,
+                                          n_iter=self.n_iter, transpose=self.transpose)
 
     def predict(self) ->  npt.NDArray:
         """Generate a reconstruction of the original input data using the stored factorization.
@@ -444,7 +513,10 @@ class NMF:
             A reconstruction of the original input dataset, with same shape and
             size.
         """
-        return self.W @ self.H
+        if self.transpose:
+            return self.H @ self.W
+        else:
+            return self.W @ self.H
 
     def fit_coeffs(self, X: npt.ArrayLike, V: npt.ArrayLike) -> npt.NDArray:
         """Generate coefficients fitting this object's NMF templates
@@ -453,9 +525,11 @@ class NMF:
         Parameters
         ----------
         X : array_like
-            Input data of shape (n_dimensions, n_observations).
+            Input data of shape (n_dimensions, n_observations). Dimensions should
+            be flipped if the object was instantiated with `tranpose=True`.
         V : array_like
-            Input weights of shape (n_dimensions, n_observations).
+            Input weights of shape (n_dimensions, n_observations). Dimensions should
+            be flipped if the object was instantiated with `tranpose=True`.
 
         Returns
         -------
