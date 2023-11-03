@@ -12,14 +12,16 @@ try:
 except ImportError:
     cp = None
 
-def _get_array_module(data):
+def _get_array_module(data, use_gpu=None):
     """
-    Return either numpy or cupy depending upon type of `data`
+    Return either numpy or cupy depending upon type of `data` and `use_gpu`
 
     Parameters
     ----------
     data : array_like
         Input array to derive CPU or GPU usage
+    use_gpu : bool, optional
+        Override whether to use GPU or not; by default auto-derive
 
     Returns
     -------
@@ -30,12 +32,20 @@ def _get_array_module(data):
     ------
     ValueError if data is neither numpy nor cupy array
     """
-    if isinstance(data, np.ndarray):
-        return np
-    elif cp is not None and isinstance(data, cp.ndarray):
-        return cp
+    if use_gpu is None:
+        if isinstance(data, np.ndarray):
+            return np
+        elif cp is not None and isinstance(data, cp.ndarray):
+            return cp
+        else:
+            raise ValueError(f'Unknown array type {type(data)}')
+    elif use_gpu:
+        if cp is not None:
+            return cp
+        else:
+            raise ValueError('use_gpu=True but GPU not available')
     else:
-        raise ValueError(f'Unknown array type {type(data)}')
+        return np
 
 def shift_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike,
             W_start: npt.ArrayLike, n_iter: int = 500, update_H: bool = True,
@@ -283,7 +293,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
             n_iter: int = 500, update_H: bool = True,
             update_W: bool = True, algorithm: str = "nearly",
             return_chi_2: bool = False, verbose: bool = False,
-            transpose: bool = False) ->  tuple[npt.NDArray, npt.NDArray]:
+            transpose: bool = False,
+            use_gpu: bool = None,
+            ) ->  tuple[npt.NDArray, npt.NDArray]:
     """Fit NMF templates to noisy, possibly negative, data with weights using the specified algorithm.
 
     Parameters
@@ -330,6 +342,11 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         Whether or not to train in "transposed" form, where the observations
         are the rows of X rather than the columns. Note that this
         flips the dimensions for all input arrays. Defaults to False.
+    use_gpu : bool, optional
+        If True, use GPU even if input X and V are numpy arrays on CPU.
+        If False, use CPU even if input X and V are cupy arrays on GPU.
+        By default (None), auto-derive whether to use GPU based upon
+        numpy vs. cupy type of input X and V.
 
     Returns
     -------
@@ -344,7 +361,20 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         The chi^2 history of the fit.  Only returned if `return_chi_2` is True.
     """
     # GPU (cupy) or CPU (numpy)?
-    xp = _get_array_module(X)
+    xp = _get_array_module(X, use_gpu)
+
+    # Move data to GPU if requested
+    input_type = type(X)
+    if use_gpu and input_type == np.ndarray:
+        X = cp.asarray(X)
+        V = cp.asarray(V)
+        if H_start is not None:
+            H_start = cp.asarray(H_start)
+        if W_start is not None:
+            W_start = cp.asarray(W_start)
+
+    if use_gpu is False and cp is not None and input_type == cp.ndarray:
+        raise TypeError('Input cupy arrays with use_gpu=False is not supported; move inputs to CPU first')
 
     if (H_start is not None) and (W_start is not None):
         if transpose:
@@ -396,6 +426,10 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
     else:
         to_return = nearly_NMF(X, V, H, W, n_iter, update_H, update_W, return_chi_2, verbose, transpose)
 
+    #- if forcing use_gpu, match return to input datatype
+    if use_gpu is True and input_type == np.ndarray:
+        to_return = tuple([tmp.get() for tmp in to_return])
+
     return to_return
 
 
@@ -403,7 +437,7 @@ class NMF:
     def __init__(self, X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
                  W_start: npt.ArrayLike = None, n_templates: int = 2, n_iter: int = 500,
                  algorithm: str = "nearly", return_chi_2: bool = False,
-                 verbose: bool = False, transpose: bool = False):
+                 verbose: bool = False, transpose: bool = False, use_gpu: bool = None):
         """An NMF model object. This object holds all of the relevant NMF algorithmic data, namely
         fitted coefficients and templates/basis vectors for its training dataset.
 
@@ -445,12 +479,15 @@ class NMF:
             Whether or not to train in "transposed" form, where the observations
             are the rows of X rather than the columns. Note that this
             flips the dimensions for all input arrays. Defaults to False.
+        use_gpu : bool, optional
+            Override whether to use GPU or not; by default auto-derive
 
         """
         # GPU (cupy) or CPU (numpy)?
         xp = _get_array_module(X)
 
         self.X, self.V = xp.asarray(X), xp.asarray(V)
+        self.use_gpu = use_gpu
 
         if (H_start is not None) and (W_start is not None):
             if transpose:
@@ -496,7 +533,10 @@ class NMF:
 
         # Internally store which fitting function we'll be using since the
         # object initialization has done sanity checking.
-        self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
+        # self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
+
+        self.algorithm = algorithm
+
         self.return_chi_2 = return_chi_2
         self.verbose = verbose
 
@@ -507,12 +547,14 @@ class NMF:
         """Fit this NMF object to noisy, possibly negative, data with weights.
         """
         if self.return_chi_2:
-            self.H, self.W, self.chi_2 = self.fit_NMF(self.X, self.V, self.H, self.W,
+            self.H, self.W, self.chi_2 = fit_NMF(self.X, self.V, self.H, self.W,
                                                       n_iter=self.n_iter, return_chi_2=self.return_chi_2,
-                                                      verbose=self.verbose, transpose=self.transpose)
+                                                      verbose=self.verbose, transpose=self.transpose,
+                                                      use_gpu=self.use_gpu, algorithm=self.algorithm)
         else:
-            self.H, self.W = self.fit_NMF(self.X, self.V, self.H, self.W,
-                                          n_iter=self.n_iter, transpose=self.transpose)
+            self.H, self.W = fit_NMF(self.X, self.V, self.H, self.W,
+                                          n_iter=self.n_iter, transpose=self.transpose, use_gpu=self.use_gpu,
+                                          algorithm=self.algorithm)
 
     def predict(self) ->  npt.NDArray:
         """Generate a reconstruction of the original input data using the stored factorization.
