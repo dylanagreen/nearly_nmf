@@ -344,9 +344,9 @@ def fit_NMF(X: npt.ArrayLike, V: npt.ArrayLike, H_start: npt.ArrayLike = None,
         flips the dimensions for all input arrays. Defaults to False.
     use_gpu : bool, optional
         If True, use GPU even if input X and V are numpy arrays on CPU.
-        If False, use CPU even if input X and V are cupy arrays on GPU.
         By default (None), auto-derive whether to use GPU based upon
         numpy vs. cupy type of input X and V.
+        use_gpu=False with cupy inputs is not supported.
 
     Returns
     -------
@@ -531,12 +531,8 @@ class NMF:
             self.W = xp.asarray(self.rng.uniform(0, 2, W_shape))
             if transpose: self.W = self.W.T
 
-        # Internally store which fitting function we'll be using since the
-        # object initialization has done sanity checking.
-        # self.fit_NMF = shift_NMF if algorithm == "shift" else nearly_NMF
-
+        # Options to pass to fit_NMF
         self.algorithm = algorithm
-
         self.return_chi_2 = return_chi_2
         self.verbose = verbose
 
