@@ -1,0 +1,30 @@
+# Compiled files
+__pycache__/
+*.py[co]
+
+# Other generated files
+htmlcov
+.coverage
+
+# iPython
+.ipynb_checkpoints
+
+# Packages/installer info
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+var
+sdist
+develop-eggs
+.installed.cfg
+distribute-*.tar.gz
+
+# Other
+.*.swp
+*~
+.vscode
+.env
+
